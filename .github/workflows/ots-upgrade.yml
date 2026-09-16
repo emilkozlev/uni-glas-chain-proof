@@ -1,0 +1,46 @@
+name: OpenTimestamps - Upgrade pending proofs
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install OpenTimestamps client
+        run: pip install opentimestamps-client
+
+      - name: Upgrade existing proof files
+        run: |
+          set +e
+          for f in proofs/*.ots; do
+            [ -e "$f" ] || continue
+            echo "Upgrading $f"
+            ots upgrade "$f"
+          done
+          set -e
+
+      - name: Commit and push upgraded proofs
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- proofs/; then
+            git add proofs/*.ots
+            git commit -m "OpenTimestamps: upgrade pending proof(s)"
+            git push
+          else
+            echo "No changes - nothing to upgrade yet."
+          fi
