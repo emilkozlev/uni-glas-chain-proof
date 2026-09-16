@@ -1,0 +1,48 @@
+name: OpenTimestamps - Stamp new proofs
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'proofs/**.json'
+
+permissions:
+  contents: write
+
+jobs:
+  stamp:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install OpenTimestamps client
+        run: pip install opentimestamps-client
+
+      - name: Stamp new proof files
+        run: |
+          set -e
+          changed=0
+          for f in proofs/*.json; do
+            [ -e "$f" ] || continue
+            if [ ! -f "${f}.ots" ]; then
+              echo "Stamping $f"
+              ots stamp "$f"
+              changed=1
+            fi
+          done
+          echo "changed=$changed" >> "$GITHUB_ENV"
+
+      - name: Commit and push new .ots files
+        if: env.changed == '1'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add proofs/*.ots
+          git commit -m "OpenTimestamps: stamp new proof(s)"
+          git push
